@@ -1,9 +1,11 @@
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { v4: uuidv4 } = require('uuid');
+
+const endpoint = process.env.S3_ENDPOINT || `https://s3.${process.env.AWS_REGION}.amazonaws.com`;
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
+  endpoint,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -25,11 +27,16 @@ const uploadFile = async (buffer, mimetype, folder) => {
     })
   );
 
-  return `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+  const baseUrl = process.env.S3_ENDPOINT
+    ? `${process.env.S3_ENDPOINT}/${BUCKET}`
+    : `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com`;
+
+  return `${baseUrl}/${key}`;
 };
 
 const deleteFile = async (url) => {
-  const key = url.split('.amazonaws.com/')[1];
+  const parts = url.split(`/${BUCKET}/`);
+  const key = parts[1];
   if (!key) return;
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 };

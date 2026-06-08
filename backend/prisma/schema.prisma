@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  LISTENER
+  ARTIST
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id              String    @id @default(uuid())
+  googleId        String    @unique @map("google_id")
+  email           String    @unique
+  name            String
+  avatarUrl       String?   @map("avatar_url")
+  role            UserRole  @default(LISTENER)
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  artistProfile   ArtistProfile?
+  nasheeds        Nasheed[]
+  playlists       Playlist[]
+  likes           Like[]
+  playHistory     PlayHistory[]
+  followers       Follow[]  @relation("Followed")
+  following       Follow[]  @relation("Follower")
+
+  @@map("users")
+}
+
+model ArtistProfile {
+  id                  String             @id @default(uuid())
+  userId              String             @unique @map("user_id")
+  bio                 String?
+  verificationStatus  VerificationStatus @default(PENDING) @map("verification_status")
+  verificationDocUrl  String?            @map("verification_doc_url")
+  verificationNote    String?            @map("verification_note")
+  totalPlays          BigInt             @default(0) @map("total_plays")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("artist_profiles")
+}
+
+model Nasheed {
+  id           String   @id @default(uuid())
+  artistId     String   @map("artist_id")
+  title        String
+  description  String?
+  audioUrl     String   @map("audio_url")
+  coverUrl     String?  @map("cover_url")
+  duration     Int      // seconds
+  playsCount   BigInt   @default(0) @map("plays_count")
+  likesCount   Int      @default(0) @map("likes_count")
+  isPublished  Boolean  @default(true) @map("is_published")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  artist       User     @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  likes        Like[]
+  playHistory  PlayHistory[]
+  playlistItems PlaylistNasheed[]
+
+  @@map("nasheeds")
+}
+
+model Playlist {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  name       String
+  coverUrl   String?  @map("cover_url")
+  isPublic   Boolean  @default(false) @map("is_public")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items      PlaylistNasheed[]
+
+  @@map("playlists")
+}
+
+model PlaylistNasheed {
+  playlistId  String   @map("playlist_id")
+  nasheedId   String   @map("nasheed_id")
+  order       Int      @default(0)
+  addedAt     DateTime @default(now()) @map("added_at")
+
+  playlist    Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  nasheed     Nasheed  @relation(fields: [nasheedId], references: [id], onDelete: Cascade)
+
+  @@id([playlistId, nasheedId])
+  @@map("playlist_nasheeds")
+}
+
+model Like {
+  userId     String   @map("user_id")
+  nasheedId  String   @map("nasheed_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nasheed    Nasheed  @relation(fields: [nasheedId], references: [id], onDelete: Cascade)
+
+  @@id([userId, nasheedId])
+  @@map("likes")
+}
+
+model PlayHistory {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  nasheedId   String   @map("nasheed_id")
+  playedAt    DateTime @default(now()) @map("played_at")
+  duration    Int      @default(0) // seconds listened
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nasheed     Nasheed  @relation(fields: [nasheedId], references: [id], onDelete: Cascade)
+
+  @@map("play_history")
+}
+
+model Follow {
+  followerId  String   @map("follower_id")
+  followedId  String   @map("followed_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followed    User     @relation("Followed", fields: [followedId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followedId])
+  @@map("follows")
+}
+
+model QuranSurah {
+  id                  Int      @id
+  nameArabic          String   @map("name_arabic")
+  nameTransliteration String   @map("name_transliteration")
+  nameTranslation     String   @map("name_translation")
+  versesCount         Int      @map("verses_count")
+  revelationType      String   @map("revelation_type") // Meccan / Medinan
+  audioUrl            String?  @map("audio_url")
+
+  @@map("quran_surahs")
+}
